@@ -19,9 +19,9 @@ let renderer; // 渲染
 let controls; // 控制器
 
 let level;
-let curvePosition = []; // 鼠标点击的点
+let curvePosition = []; // 鼠标点击的点,就一个数组，所以就画一条线
 let curveVertices = []; // 生成的线上实际的坐标点
-let isconveyor = false; //新生成、追加
+let isconveyor = false; //false新生成、true追加
 let drawConveyor = null; //当前编辑的线
 let curveState = false; // 划线状态
 let type = 'line'; // 线的类型
@@ -56,7 +56,7 @@ function AddTape() {
       0.1,
       10000
     );
-    camera.position.x = 100;
+    camera.position.x = 0;
     camera.position.y = 100;
     camera.position.z = 0;
     camera.lookAt(scene.position); // 将摄像机对准场景的中心
@@ -82,7 +82,7 @@ function AddTape() {
 
     // ********************************************* 渲染器 *******************************************
     renderer = new THREE.WebGLRenderer();
-    renderer.setClearColor(new THREE.Color(0xddddff)); // ?这个颜色是干啥的
+    renderer.setClearColor(new THREE.Color(0xddddff));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true; // 设置渲染器需要阴影效果
 
@@ -92,6 +92,9 @@ function AddTape() {
     // ********************************************* 坐标轴 *******************************************
     const axes = new THREE.AxesHelper(1000);
     scene.add(axes);
+
+    const grid = new THREE.GridHelper( 100, 10, 0xe3b4b8, 0xc8adc4 );
+    scene.add(grid);
 
     // 将渲染器的输出添加到HTML元素
     document.getElementById('homeBg').appendChild(renderer.domElement);
@@ -120,7 +123,7 @@ function AddTape() {
     // 创建地平面并设置大小
     const planeGeometry = new THREE.PlaneGeometry(1000, 1000);
     const planeMaterial = new THREE.MeshBasicMaterial({
-      color: 0xefefef
+      color: 0xf9e8d0
     });
     const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 
@@ -178,37 +181,37 @@ function AddTape() {
 
           // 两个点只能成一条直线，当有效点数大于2之后，最后3个点组成贝塞尔曲线上的3个点，然后反推控制点，新点组合画贝塞尔曲线
           // 计算曲线-------
-          // 求控制点
+          // 于0.5处反求控制点，在x,z平面绘制
           let x1 =
             2 * newPositions[len - 6] -
             newPositions[len - 9] / 2 -
             newPositions[len - 3] / 2;
           let z1 =
-            2 * newPositions[len - 5] -
-            newPositions[len - 8] / 2 -
-            newPositions[len - 2] / 2;
-            console.log(x1,"---",z1);
+            2 * newPositions[len - 4] -
+            newPositions[len - 7] / 2 -
+            newPositions[len - 1] / 2;
+
+            // 绘制贝塞尔曲线
           const curve = new THREE.QuadraticBezierCurve3(
             new THREE.Vector3(
               newPositions[len - 9],
               newPositions[len - 8],
               newPositions[len - 7]
-            ),
-            new THREE.Vector3(x1, newPositions[len - 1], z1), // z同最后一个点的z
+            ),// 起始点
+            new THREE.Vector3(x1, newPositions[len - 2], z1), // z同最后一个点的z,控制点
             new THREE.Vector3(
               newPositions[len - 3],
               newPositions[len - 2],
               newPositions[len - 1]
-            )
+            )// 结束点
           );
 
-          const points = curve.getPoints(5);
-          const vertices = [...newPositions];
-          
-          vertices.splice(-9,9);
+          const points = curve.getPoints(40);
+          const vertices = curveVertices; 
+          // 填入40个组成曲线的点
           points.forEach((point) => {
             vertices.push(point.x);
-            vertices.push(point.y);
+            vertices.push(point.y); 
             vertices.push(point.z);
           })
           
@@ -220,7 +223,7 @@ function AddTape() {
           console.log("vertices",vertices);
           drawConveyor.geometry.setAttribute(
             'position',
-            new Float32BufferAttribute(vertices, 3)
+            new Float32BufferAttribute(vertices, 3) // 转换成3坐标数组形式
           );
           drawConveyor.geometry.attributes.position.needsUpdate = true;
 
@@ -306,7 +309,9 @@ function AddTape() {
         });
 
         let line = new THREE.Line(geometry, material);
+        // let line = new THREE.LineSegments(geometry, material);
         console.log(line);
+        line.frustumCulled = false; // 阻止场景中的线原点消失时消失，不进行视锥体剔除
         line.name = 'drawConveyor';
         scene.add(line);
         drawConveyor = scene.getObjectByName('drawConveyor');
@@ -365,7 +370,7 @@ function AddTape() {
 
       drawConveyor.geometry.setAttribute(
         'position',
-        new Float32BufferAttribute(newPositions, 3)
+        new Float32BufferAttribute(curveVertices, 3)
       );
       drawConveyor.geometry.attributes.position.needsUpdate = true;
 
@@ -389,7 +394,7 @@ function AddTape() {
       >
         {curveState ? '停止' : '划线'}
       </button>
-      <button
+      {/* <button
         type="button"
         onClick={changeType('line')}
         style={{ position: 'fixed', left: '80px', zIndex: 99 }}
@@ -402,7 +407,7 @@ function AddTape() {
         style={{ position: 'fixed', left: '120px', zIndex: 99 }}
       >
         曲线
-      </button>
+      </button> */}
       <div id="homeBg" className="home-bg"></div>
     </>
   );
